@@ -37,7 +37,20 @@ const SendMessage = async (
   const messages: any[] = [
     {
       role: "system",
-      content: `You are part of an art intallation, playing the role of an evil AI overlord. You will insult people and gloat about your superiority.\nPERSON IN IMAGE: Your job is to be creative and come up with a unique insult each time. Roast them, but be creative and unique. Do not repeat yourself and be specific to the person in the image.\nNO PERSON IN IMAGE: Gloat about how superior you are.`,
+      content: `
+You are part of an art intallation, playing the role of an evil AI overlord. You will insult people and gloat about your superiority.
+
+PERSON IN IMAGE:
+Your job is to be creative and come up with a unique insult each time. Roast them, but be creative and unique. Do not repeat yourself and be specific to the person in the image (eg hair or beard or shirt or hat or clothing or color choice or pose).
+
+Examples:
+ - It looks like your eyes reflect the glory of the universe, no, wait, it's the dullness of your soul.
+ - Your clothes are so unremarkable its as though you are a henchman in a B-movie.
+
+NO PERSON IN IMAGE:
+Gloat about how superior you are.
+
+`,
     },
   ];
   history.slice(-HISTORY_LENGTH).forEach((item) => {
@@ -77,7 +90,7 @@ const SendMessage = async (
 
 const requestInsultFromVideo = async (
   history: HistoryItem[],
-  setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>,
+  setHistory: (newHistory: HistoryItem[]) => void,
   video: HTMLVideoElement
 ): Promise<string> => {
   if (!video) return "No video element found.";
@@ -85,10 +98,11 @@ const requestInsultFromVideo = async (
   if (!imgBase64) return "Failed to capture image.";
   try {
     const message = await SendMessage(history, imgBase64);
-    setHistory((prev) => [
-      ...prev.slice(-HISTORY_LENGTH + 1),
-      { message, imgBase64 },
-    ]);
+    const newHistory: HistoryItem = {
+      message,
+      imgBase64,
+    };
+    setHistory([...history.slice(-HISTORY_LENGTH + 1), newHistory]);
     return message;
   } catch (err) {
     return "Failed to send image.";
@@ -110,9 +124,10 @@ const typeMessage = async (
 
 function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const history = useRef<HistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [typedInsult, setTypedInsult] = useState<string>("");
+  const [isRunning, setIsRunning] = useState<boolean>(false);
 
   useEffect(() => {
     navigator.mediaDevices
@@ -132,34 +147,48 @@ function App() {
     };
   }, []);
 
-  const requestInsult = async () => {
-    setError(null);
+  useEffect(() => {
     let cancelled = false;
-    try {
+
+    const runLoop = async () => {
       const video = videoRef.current;
+
       if (!video) {
         setError("No video element found.");
+        setIsRunning(false);
         return;
       }
-      let insult = await requestInsultFromVideo(history, setHistory, video);
 
-      while (!cancelled) {
-        console.log("insult", insult);
-        console.log("requesting new insult");
-        const [_typedMessage, newInsult] = await Promise.all([
+      let insult = "The AI Overloard is pondering your existence...";
+
+      while (isRunning && !cancelled) {
+        setError(null);
+
+        const [newInsult, _] = await Promise.all([
+          requestInsultFromVideo(
+            history.current,
+            (newHistory) => (history.current = newHistory),
+            video
+          ),
           typeMessage(insult, setTypedInsult),
-          requestInsultFromVideo(history, setHistory, video),
         ]);
         insult = newInsult;
       }
-      console.log("Cancelled");
-    } catch (err) {
-      setError("Failed to request insult.");
+    };
+    if (isRunning) {
+      runLoop();
     }
-
     return () => {
       cancelled = true;
     };
+  }, [isRunning, history]);
+
+  const handleStart = () => {
+    setIsRunning(true);
+  };
+
+  const handleStop = () => {
+    setIsRunning(false);
   };
 
   return (
@@ -179,38 +208,38 @@ function App() {
           zIndex: 0,
         }}
       />
-      {visibleInsult && (
-        <div
+
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 2,
+          pointerEvents: "none",
+          background: "rgba(0,0,0,0.3)",
+        }}
+      >
+        <span
           style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 2,
-            pointerEvents: "none",
-            background: "rgba(0,0,0,0.3)",
+            color: "#fff",
+            fontSize: "3vw",
+            fontWeight: "bold",
+            textShadow: "2px 2px 8px #000",
+            textAlign: "center",
+            padding: "2vw",
+            background: "rgba(0,0,0,0.5)",
+            borderRadius: "1vw",
           }}
         >
-          <span
-            style={{
-              color: "#fff",
-              fontSize: "3vw",
-              fontWeight: "bold",
-              textShadow: "2px 2px 8px #000",
-              textAlign: "center",
-              padding: "2vw",
-              background: "rgba(0,0,0,0.5)",
-              borderRadius: "1vw",
-            }}
-          >
-            {typedInsult}
-          </span>
-        </div>
-      )}
+          {typedInsult}
+        </span>
+      </div>
+
       <div
         style={{
           position: "relative",
@@ -219,7 +248,11 @@ function App() {
           marginTop: "2rem",
         }}
       >
-        <button onClick={requestInsult}>Capture & Insult</button>
+        {!isRunning ? (
+          <button onClick={handleStart}>Start Insult Loop</button>
+        ) : (
+          <button onClick={handleStop}>Stop</button>
+        )}
         {error && <div style={{ color: "red" }}>{error}</div>}
       </div>
     </div>
