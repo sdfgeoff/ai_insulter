@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import './App.css';
 
-const API_URL = 'http://localhost:1234/v1/chat/completions';
+const API_URL = '/api/v1/chat/completions';
 const HISTORY_LENGTH = 2;
 
 interface HistoryItem {
