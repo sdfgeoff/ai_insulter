@@ -108,14 +108,27 @@ function App() {
   return (
     <div className="App">
       <h1>AI Insulter</h1>
-      <video ref={videoRef} autoPlay playsInline width={320} height={240} style={{ border: '1px solid #ccc' }} />
-      <div>
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        style={{
+          width: '100vw',
+          height: '100vh',
+          objectFit: 'cover',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          zIndex: 0
+        }}
+      />
+      <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', marginTop: '2rem' }}>
         <button onClick={sendImage} disabled={loading}>Capture & Insult</button>
         {loading && <span>Sending...</span>}
         {error && <div style={{ color: 'red' }}>{error}</div>}
       </div>
-      <h2>History</h2>
-      <div className="history">
+      <h2 style={{ position: 'relative', zIndex: 1 }}>History</h2>
+      <div className="history" style={{ position: 'relative', zIndex: 1 }}>
         {history.map((item, idx) => (
           <div key={idx} className="history-item">
             <img src={`data:image/jpeg;base64,${item.imgBase64}`} alt="Webcam" width={64} />
