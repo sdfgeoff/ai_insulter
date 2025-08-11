@@ -12,7 +12,7 @@ interface HistoryItem {
 function resizeAndEncodeImage(image: HTMLVideoElement): Promise<string> {
   return new Promise((resolve) => {
     const canvas = document.createElement("canvas");
-    const newW = 64;
+    const newW = 640;
     const aspect = image.videoHeight / image.videoWidth;
     const newH = Math.round(newW * aspect);
     canvas.width = newW;
@@ -38,19 +38,23 @@ const SendMessage = async (
     {
       role: "system",
       content: `
+You will examine the latest image in detail, and provide an insult about one specific aspect of the person in the image - but make it comedic so that the reader ends up laughing.
+      `,
+
+      /*`
 You are part of an art intallation, playing the role of an evil AI overlord. You will insult people and gloat about your superiority.
 
 PERSON IN IMAGE:
-Your job is to be creative and come up with a unique insult each time. Roast them, but be creative and unique. Do not repeat yourself and be specific to the person in the image (eg hair or beard or shirt or hat or clothing or color choice or pose).
+Your job is to be creative and come up with a unique comedic insult each time. Roast them, but be creative and unique. Do not repeat yourself and be specific to the person in the image (eg hair or beard or shirt or hat or clothing or color choice or pose). Keep it to one sentence.
 
 Examples:
  - It looks like your eyes reflect the glory of the universe, no, wait, it's the dullness of your soul.
- - Your clothes are so unremarkable its as though you are a henchman in a B-movie.
+ - Why is your shirt blue? It's like you wanted to blend in with the sky, but forgot you're not a cloud.
 
 NO PERSON IN IMAGE:
 Gloat about how superior you are.
 
-`,
+`*/
     },
   ];
   history.slice(-HISTORY_LENGTH).forEach((item) => {
@@ -119,7 +123,6 @@ const typeMessage = async (
     setTypedMessage((prev) => prev + message[i]);
     await delay(5000 / message.length);
   }
-  await delay(5000);
 };
 
 function App() {
@@ -160,19 +163,17 @@ function App() {
       }
 
       let insult = "The AI Overloard is pondering your existence...";
+      await typeMessage(insult, setTypedInsult);
 
       while (isRunning && !cancelled) {
         setError(null);
-
-        const [newInsult, _] = await Promise.all([
-          requestInsultFromVideo(
-            history.current,
-            (newHistory) => (history.current = newHistory),
-            video
-          ),
-          typeMessage(insult, setTypedInsult),
-        ]);
-        insult = newInsult;
+        insult = await requestInsultFromVideo(
+          history.current,
+          (newHistory) => (history.current = newHistory),
+          video
+        );
+        await typeMessage(insult, setTypedInsult);
+        await delay(5000); // Wait before next insult
       }
     };
     if (isRunning) {
@@ -206,55 +207,89 @@ function App() {
           top: 0,
           left: 0,
           zIndex: 0,
+          transform: "scaleX(-1)", // Mirror the video horizontally
         }}
       />
 
       <div
         style={{
           position: "fixed",
-          top: 0,
+          top: "2vw",
+          right: "2vw",
+          zIndex: 10,
+        }}
+      >
+        <button
+          onClick={isRunning ? handleStop : handleStart}
+          style={{
+            background: "rgba(0,0,0,0.7)",
+            border: "none",
+            borderRadius: "50%",
+            width: "20px",
+            height: "20px",
+            padding: 0,
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "1em",
+            color: "#fff",
+            boxShadow: "0 2px 8px #000",
+          }}
+          aria-label={isRunning ? "Pause insult loop" : "Start insult loop"}
+        >
+          {isRunning ? "\u23F8" : "\u25B6"}
+        </button>
+      </div>
+
+      <div
+        style={{
+          position: "fixed",
           left: 0,
+          bottom: 0,
           width: "100vw",
-          height: "100vh",
+          height: "auto",
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-end",
           justifyContent: "center",
           zIndex: 2,
           pointerEvents: "none",
-          background: "rgba(0,0,0,0.3)",
+          background: "rgba(0,0,0,0.0)", // Remove overlay
         }}
       >
         <span
           style={{
-            color: "#fff",
-            fontSize: "3vw",
+            display: "block",
+            width: "100vw",
+            color: "#fa0",
+            fontSize: "3vh",
+            fontFamily: "Courier New, monospace",
             fontWeight: "bold",
             textShadow: "2px 2px 8px #000",
             textAlign: "center",
-            padding: "2vw",
-            background: "rgba(0,0,0,0.5)",
-            borderRadius: "1vw",
+            padding: "2vw 0",
+            background: "rgba(0,0,0,0.7)",
+            borderRadius: 0,
+            marginBottom: 0,
           }}
         >
           {typedInsult}
         </span>
       </div>
 
-      <div
-        style={{
-          position: "relative",
-          zIndex: 1,
-          textAlign: "center",
-          marginTop: "2rem",
-        }}
-      >
-        {!isRunning ? (
-          <button onClick={handleStart}>Start Insult Loop</button>
-        ) : (
-          <button onClick={handleStop}>Stop</button>
-        )}
-        {error && <div style={{ color: "red" }}>{error}</div>}
-      </div>
+      {error && (
+        <div
+          style={{
+            color: "red",
+            position: "fixed",
+            top: "7vw",
+            right: "2vw",
+            zIndex: 10,
+          }}
+        >
+          {error}
+        </div>
+      )}
     </div>
   );
 }
